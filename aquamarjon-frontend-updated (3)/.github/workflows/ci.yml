@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Отдельным шагом, а не только внутри `npm run build` — так в логах PR
+      # сразу видно, упал именно тайпчек или что-то другое.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      # `npm run build` сам ещё раз гоняет tsc --noEmit (см. package.json) —
+      # небольшое дублирование с шагом Typecheck выше, но так `build`
+      # остаётся самодостаточной командой и для локального запуска,
+      # а не только для CI.
+      - name: Build
+        run: npm run build
+
+  # Проверка форматирования вынесена в отдельный необязательный джоб
+  # (continue-on-error) — на момент подключения Prettier существующий код
+  # ещё не прогнан через `prettier --write .` целиком (это отдельный крупный
+  # PR, который стоит смотреть глазами, а не мёржить вслепую). Когда такой
+  # PR будет смёржен, можно убрать continue-on-error и сделать формат
+  # обязательным для новых PR.
+  format:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
